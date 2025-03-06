@@ -1,0 +1,5 @@
+# use this commands to create lambda_function.zip
+ cd package
+ Compress-Archive -Path * -DestinationPath ../lambda_function.zip -Update
+ cd ..
+ Compress-Archive -Path lambda_function.py -DestinationPath lambda_function.zip -Update
