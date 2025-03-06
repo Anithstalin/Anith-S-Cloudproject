@@ -1,0 +1,12 @@
+{
+    "Items": [
+        {
+            "filename": {"S": "sample.csv"},
+            "upload_timestamp": {"S": "2025-03-06 10:00:00"},
+            "file_size_bytes": {"N": "1024"},
+            "row_count": {"N": "3"},
+            "column_count": {"N": "5"},
+            "column_names": {"SS": ["id", "name", "age", "city", "date"]}
+        }
+    ]
+}
