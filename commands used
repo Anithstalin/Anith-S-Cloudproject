@@ -1,0 +1,70 @@
+# Aurthor: Anith S
+# Scripting used : Powershell
+# Create a new project directory and move into it
+mkdir CloudProject
+cd CloudProject
+
+# Create required files (Lambda function and sample CSV)
+New-Item lambda_function.py
+New-Item sample.csv
+
+# Write the Lambda function script (Open `lambda_function.py` in an editor and paste the code)
+# (check lambda_function.py in zip or git)
+
+# Write a sample CSV file (Open `sample.csv` in Notepad and paste the sample data)
+# sample.csv in drive
+
+# Create a package folder for dependencies
+mkdir package
+
+# Install required Python dependencies in the package folder
+mkdir package
+ pip install --target ./package pandas boto3
+
+# Package everything into a Lambda ZIP file (dependencies + script)
+ cd package
+ Compress-Archive -Path * -DestinationPath ../lambda_function.zip -Update
+ cd ..
+ Compress-Archive -Path lambda_function.py -DestinationPath lambda_function.zip -Update
+
+# Start Localstack in the background (Docker must be running)
+localstack start -d
+
+# Create an S3 bucket in Localstack
+awslocal s3 mb s3://csv-bucket
+
+# Upload the sample CSV file to the S3 bucket
+awslocal s3 cp sample.csv s3://csv-bucket
+
+# Create a DynamoDB table to store CSV metadata
+awslocal dynamodb create-table --table-name MetadataTable --attribute-definitions AttributeName=filename,AttributeType=S --key-schema AttributeName=filename,KeyType=HASH --billing-mode PAY_PER_REQUEST
+
+# Deploy the Lambda function in Localstack
+awslocal lambda create-function --function-name ProcessCSV --runtime python3.8 --role arn:aws:iam::000000000000:role/execution_role --handler lambda_function.lambda_handler --zip-file fileb://lambda_function.zip
+
+# Set up S3 event notifications to trigger Lambda when a file is uploaded
+awslocal s3api put-bucket-notification-configuration --bucket csv-bucket --notification-configuration "{ \"LambdaFunctionConfigurations\": [{ \"LambdaFunctionArn\": \"arn:aws:lambda:us-east-1:000000000000:function:ProcessCSV\", \"Events\": [\"s3:ObjectCreated:*\"] }] }"
+
+# Test the Lambda function manually
+awslocal lambda invoke --function-name ProcessCSV output.json
+cat output.json  # View the output to confirm execution
+
+# Re-upload CSV to test automatic Lambda trigger via S3
+awslocal s3 cp sample.csv s3://csv-bucket
+
+# Check Localstack logs to verify Lambda execution
+localstack logs
+
+# Verify if metadata is stored in DynamoDB
+awslocal dynamodb scan --table-name MetadataTable
+
+# Increase Lambda timeout (if required)
+awslocal lambda update-function-configuration --function-name ProcessCSV --timeout 15
+
+# Restart Localstack if needed
+localstack stop
+localstack start -d
+
+# Shut down everything once done
+localstack stop
+wsl --shutdown
